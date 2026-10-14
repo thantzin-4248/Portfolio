@@ -1,42 +1,12 @@
-
-import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { projects } from "../data/projects";
 import ProjectCard from "../components/ProjectCard";
 import ProjectForm from "../components/ProjectForm";
-
-const STORAGE_KEY = "portfolio-added-projects";
+import { useProjects } from "../hooks/useProjects";
+import { useCallback, useMemo } from "react";
 
 function Projects() {
-  // Load user-added projects from localStorage.
-  const [addedProjects, setAddedProjects] = useState(() => {
-    try {
-      const savedProjects = localStorage.getItem(STORAGE_KEY);
-
-      if (!savedProjects) {
-        return [];
-      }
-
-      const parsedProjects = JSON.parse(savedProjects);
-
-      return Array.isArray(parsedProjects) ? parsedProjects : [];
-    } catch (error) {
-      console.error("Could not load saved projects:", error);
-      return [];
-    }
-  });
-
-  // Save user-added projects whenever they change.
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(addedProjects),
-      );
-    } catch (error) {
-      console.error("Could not save projects:", error);
-    }
-  }, [addedProjects]);
+  const { addedProjects, addProject, removeProject } = useProjects();
 
   // Read search and category filters from the URL.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,17 +15,19 @@ function Projects() {
   const requestedCategory = searchParams.get("category") ?? "All";
 
   // Combine predefined and user-added projects.
-  const allProjects = [...projects, ...addedProjects];
+  const allProjects = useMemo(() => {
+    return [...projects, ...addedProjects];
+  }, [addedProjects]);
 
   // Generate categories dynamically.
-  const categories = [
-    "All",
-    ...new Set(
-      allProjects
-        .map((project) => project.category)
-        .filter(Boolean),
-    ),
-  ];
+  const categories = useMemo(() => {
+    return [
+      "All",
+      ...new Set(
+        allProjects.map((project) => project.category).filter(Boolean),
+      ),
+    ];
+  }, [allProjects]);
 
   // Fall back to "All" if the URL contains an invalid category.
   const activeCategory = categories.includes(requestedCategory)
@@ -88,21 +60,32 @@ function Projects() {
     setSearchParams(nextParams);
   }
 
-  // Handle new projects submitted through ProjectForm.
+  // Add a new project through the custom hook.
   function handleAddProject(projectData) {
     const newProject = {
       ...projectData,
       id: crypto.randomUUID(),
     };
 
-    setAddedProjects((previousProjects) => [
-      ...previousProjects,
-      newProject,
-    ]);
+    addProject(newProject);
 
-    // Remove existing filters so the new project is visible.
+    // Clear search and category filters.
     setSearchParams({});
   }
+
+  // Delete only user-added projects.
+  const handleDeleteProject = useCallback(
+    (projectId) => {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete this project?",
+      );
+
+      if (!confirmed) return;
+
+      removeProject(projectId);
+    },
+    [removeProject],
+  );
 
   // Reset search and category filters.
   function handleResetFilters() {
@@ -112,27 +95,29 @@ function Projects() {
   // Filter projects by category and search term.
   const normalizedSearch = searchTerm.trim().toLowerCase();
 
-  const filteredProjects = allProjects.filter((project) => {
-    const matchesCategory =
-      activeCategory === "All" ||
-      project.category === activeCategory;
+  const filteredProjects = useMemo(() => {
+    return allProjects.filter((project) => {
+      const matchesCategory =
+        activeCategory === "All" || project.category === activeCategory;
 
-    const searchableText = [
-      project.title,
-      project.description,
-      ...(Array.isArray(project.technologies)
+      const technologies = Array.isArray(project.technologies)
         ? project.technologies
-        : []),
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+        : [];
 
-    const matchesSearch =
-      searchableText.includes(normalizedSearch);
+      const searchableText = [
+        project.title,
+        project.description,
+        ...technologies,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
 
-    return matchesCategory && matchesSearch;
-  });
+      const matchesSearch = searchableText.includes(normalizedSearch);
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [allProjects, activeCategory, normalizedSearch]);
 
   return (
     <section
@@ -151,8 +136,8 @@ function Projects() {
           </h2>
 
           <p className="max-w-2xl text-base leading-8 text-slate-400 sm:text-lg">
-            Explore my work, discover the technologies I use, and learn
-            how I approach real-world software development challenges.
+            Explore my work, discover the technologies I use, and learn how I
+            approach real-world software development challenges.
           </p>
         </div>
 
@@ -173,9 +158,7 @@ function Projects() {
               id="project-search"
               type="search"
               value={searchTerm}
-              onChange={(event) =>
-                updateSearchTerm(event.target.value)
-              }
+              onChange={(event) => updateSearchTerm(event.target.value)}
               placeholder="Try React, Laravel, dashboard..."
               className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             />
@@ -241,12 +224,20 @@ function Projects() {
         {/* Project results */}
         {filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-              />
-            ))}
+            {filteredProjects.map((project) => {
+              const isUserAdded = addedProjects.some(
+                (addedProject) =>
+                  String(addedProject.id) === String(project.id),
+              );
+
+              return (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onDelete={isUserAdded ? handleDeleteProject : undefined}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-16 text-center">
