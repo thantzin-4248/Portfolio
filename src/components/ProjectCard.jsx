@@ -1,20 +1,29 @@
 import { memo } from "react";
 import { Link } from "react-router";
+import { useProjects } from "../hooks/useProjects";
 
-function ProjectCard({ project, onDelete }) {
-  const {
-    id,
-    title,
-    description,
-    technologies,
-    category,
-    liveUrl,
-    githubUrl,
-  } = project;
+function ProjectCard({ project }) {
+  const { addedProjects, removeProject } = useProjects();
 
-  const safeTechnologies = Array.isArray(technologies)
-    ? technologies
-    : [];
+  const { id, title, description, technologies, category, liveUrl, githubUrl } =
+    project;
+
+  const safeTechnologies = Array.isArray(technologies) ? technologies : [];
+
+  // Determine whether this project was added by the user.
+  const isUserAdded = addedProjects.some(
+    (addedProject) => String(addedProject.id) === String(id),
+  );
+
+  function handleDelete() {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this project?",
+    );
+
+    if (confirmed) {
+      removeProject(id);
+    }
+  }
 
   return (
     <article
@@ -32,13 +41,9 @@ function ProjectCard({ project, onDelete }) {
         </span>
       </div>
 
-      <h3 className="text-xl font-bold text-white">
-        {title}
-      </h3>
+      <h3 className="text-xl font-bold text-white">{title}</h3>
 
-      <p className="mt-3 flex-1 leading-7 text-slate-400">
-        {description}
-      </p>
+      <p className="mt-3 flex-1 leading-7 text-slate-400">{description}</p>
 
       <ul className="mt-5 flex flex-wrap gap-2">
         {safeTechnologies.map((technology) => (
@@ -88,10 +93,10 @@ function ProjectCard({ project, onDelete }) {
         </Link>
       </div>
 
-      {onDelete && (
+      {isUserAdded && (
         <button
           type="button"
-          onClick={() => onDelete(id)}
+          onClick={handleDelete}
           className="mt-4 rounded-lg border border-red-500/40 px-4 py-2
             text-sm font-semibold text-red-400 transition
             hover:bg-red-500/10 focus:outline-none

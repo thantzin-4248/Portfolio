@@ -1,12 +1,13 @@
+
+import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { projects } from "../data/projects";
 import ProjectCard from "../components/ProjectCard";
 import ProjectForm from "../components/ProjectForm";
 import { useProjects } from "../hooks/useProjects";
-import { useCallback, useMemo } from "react";
 
 function Projects() {
-  const { addedProjects, addProject, removeProject } = useProjects();
+  const { addedProjects, addProject } = useProjects();
 
   // Read search and category filters from the URL.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,26 +16,30 @@ function Projects() {
   const requestedCategory = searchParams.get("category") ?? "All";
 
   // Combine predefined and user-added projects.
-  const allProjects = useMemo(() => {
-    return [...projects, ...addedProjects];
-  }, [addedProjects]);
+  const allProjects = useMemo(
+    () => [...projects, ...addedProjects],
+    [addedProjects],
+  );
 
   // Generate categories dynamically.
-  const categories = useMemo(() => {
-    return [
+  const categories = useMemo(
+    () => [
       "All",
       ...new Set(
-        allProjects.map((project) => project.category).filter(Boolean),
+        allProjects
+          .map((project) => project.category)
+          .filter(Boolean),
       ),
-    ];
-  }, [allProjects]);
+    ],
+    [allProjects],
+  );
 
-  // Fall back to "All" if the URL contains an invalid category.
+  // Fall back to All if the URL contains an invalid category.
   const activeCategory = categories.includes(requestedCategory)
     ? requestedCategory
     : "All";
 
-  // Update the search query without losing the selected category.
+  // Update the search query without losing the category.
   function updateSearchTerm(value) {
     const nextParams = new URLSearchParams(searchParams);
 
@@ -60,7 +65,7 @@ function Projects() {
     setSearchParams(nextParams);
   }
 
-  // Add a new project through the custom hook.
+  // Add a new project through the shared context.
   function handleAddProject(projectData) {
     const newProject = {
       ...projectData,
@@ -73,20 +78,6 @@ function Projects() {
     setSearchParams({});
   }
 
-  // Delete only user-added projects.
-  const handleDeleteProject = useCallback(
-    (projectId) => {
-      const confirmed = window.confirm(
-        "Are you sure you want to delete this project?",
-      );
-
-      if (!confirmed) return;
-
-      removeProject(projectId);
-    },
-    [removeProject],
-  );
-
   // Reset search and category filters.
   function handleResetFilters() {
     setSearchParams({});
@@ -98,7 +89,8 @@ function Projects() {
   const filteredProjects = useMemo(() => {
     return allProjects.filter((project) => {
       const matchesCategory =
-        activeCategory === "All" || project.category === activeCategory;
+        activeCategory === "All" ||
+        project.category === activeCategory;
 
       const technologies = Array.isArray(project.technologies)
         ? project.technologies
@@ -113,7 +105,8 @@ function Projects() {
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch = searchableText.includes(normalizedSearch);
+      const matchesSearch =
+        searchableText.includes(normalizedSearch);
 
       return matchesCategory && matchesSearch;
     });
@@ -158,7 +151,9 @@ function Projects() {
               id="project-search"
               type="search"
               value={searchTerm}
-              onChange={(event) => updateSearchTerm(event.target.value)}
+              onChange={(event) =>
+                updateSearchTerm(event.target.value)
+              }
               placeholder="Try React, Laravel, dashboard..."
               className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             />
@@ -224,20 +219,12 @@ function Projects() {
         {/* Project results */}
         {filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => {
-              const isUserAdded = addedProjects.some(
-                (addedProject) =>
-                  String(addedProject.id) === String(project.id),
-              );
-
-              return (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onDelete={isUserAdded ? handleDeleteProject : undefined}
-                />
-              );
-            })}
+            {filteredProjects.map((project) => (
+              <ProjectCard
+                key={project.id}
+                project={project}
+              />
+            ))}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-16 text-center">
