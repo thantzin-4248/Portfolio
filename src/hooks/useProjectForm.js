@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   initialProjectFormData,
@@ -7,14 +6,52 @@ import {
   validateProject,
 } from "../utils/projectValidation";
 
-export default function useProjectForm(onAddProject) {
-  const [formData, setFormData] = useState(initialProjectFormData);
+function createFormData(project) {
+  if (!project) {
+    return { ...initialProjectFormData };
+  }
+
+  return {
+    title: project.title ?? "",
+    description: project.description ?? "",
+    category: project.category ?? "",
+    technologies: Array.isArray(project.technologies)
+      ? project.technologies.join(", ")
+      : (project.technologies ?? ""),
+    liveUrl: project.liveUrl ?? "",
+    githubUrl: project.githubUrl ?? "",
+  };
+}
+
+export default function useProjectForm(onSave, initialProject = null) {
+  const initialValues = useMemo(
+    () => createFormData(initialProject),
+    [initialProject],
+  );
+
+  const [formData, setFormData] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleChange(event) {
+  // Synchronous lock prevents duplicate submissions.
+  const submissionLock = useRef(false);
+
+  // Reset fields when the initial project changes.
+  useEffect(() => {
+    setFormData(initialValues);
+    setErrors({});
+    setFormError("");
+    setSuccessMessage("");
+  }, [initialValues]);
+
+  const isDirty = useMemo(
+    () => JSON.stringify(formData) !== JSON.stringify(initialValues),
+    [formData, initialValues],
+  );
+
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target;
 
     setFormData((current) => ({
@@ -34,51 +71,62 @@ export default function useProjectForm(onAddProject) {
 
     setFormError("");
     setSuccessMessage("");
-  }
+  }, []);
 
-  async function handleSubmit(event) {
-    event.preventDefault();
-
-    if (isSubmitting) {
+  const resetForm = useCallback(() => {
+    if (submissionLock.current) {
       return;
     }
 
-    const validationErrors = validateProject(formData);
-    setErrors(validationErrors);
-    setFormError("");
-    setSuccessMessage("");
-
-    if (Object.keys(validationErrors).length > 0) {
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const newProject = normalizeProject(formData);
-
-      // Supports both synchronous callbacks and async callbacks.
-      await onAddProject(newProject);
-
-      setFormData({ ...initialProjectFormData });
-      setErrors({});
-      setSuccessMessage("Project added successfully.");
-    } catch (error) {
-      console.error("Failed to add project:", error);
-      setFormError(
-        "Unable to add the project. Please try again.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  function resetForm() {
-    setFormData({ ...initialProjectFormData });
+    setFormData(initialValues);
     setErrors({});
     setFormError("");
     setSuccessMessage("");
-  }
+  }, [initialValues]);
+
+  const handleSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+
+      // Check the lock before doing any asynchronous work.
+      if (submissionLock.current) {
+        return;
+      }
+
+      submissionLock.current = true;
+      setFormError("");
+      setSuccessMessage("");
+
+      const validationErrors = validateProject(formData);
+      setErrors(validationErrors);
+
+      if (Object.keys(validationErrors).length > 0) {
+        setFormError("Please correct the errors before saving.");
+        submissionLock.current = false;
+        return;
+      }
+
+      setIsSubmitting(true);
+
+      try {
+        const normalizedProject = normalizeProject(formData);
+
+        await onSave(normalizedProject);
+
+        setSuccessMessage("Project saved successfully.");
+      } catch (error) {
+        setFormError(
+          error instanceof Error
+            ? error.message
+            : "Unable to save the project. Please try again.",
+        );
+      } finally {
+        setIsSubmitting(false);
+        submissionLock.current = false;
+      }
+    },
+    [formData, onSave],
+  );
 
   return {
     formData,
@@ -86,6 +134,7 @@ export default function useProjectForm(onAddProject) {
     formError,
     successMessage,
     isSubmitting,
+    isDirty,
     handleChange,
     handleSubmit,
     resetForm,

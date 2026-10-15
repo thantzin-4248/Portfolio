@@ -1,10 +1,4 @@
-
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useReducer,
-} from "react";
+import { createContext, useContext, useEffect, useReducer } from "react";
 
 const STORAGE_KEY = "portfolio-added-projects";
 
@@ -32,25 +26,29 @@ function projectsReducer(state, action) {
     case "ADD_PROJECT":
       return {
         ...state,
-        addedProjects: [
-          ...state.addedProjects,
-          action.payload,
-        ],
+        addedProjects: [...state.addedProjects, action.payload],
+      };
+
+    case "UPDATE_PROJECT":
+      return {
+        ...state,
+        addedProjects: state.addedProjects.map((project) =>
+          String(project.id) === String(action.payload.id)
+            ? { ...project, ...action.payload.changes }
+            : project,
+        ),
       };
 
     case "REMOVE_PROJECT":
       return {
         ...state,
         addedProjects: state.addedProjects.filter(
-          (project) =>
-            String(project.id) !== String(action.payload),
+          (project) => String(project.id) !== String(action.payload),
         ),
       };
 
     default:
-      throw new Error(
-        `Unknown project action: ${action.type}`,
-      );
+      throw new Error(`Unknown project action: ${action.type}`);
   }
 }
 
@@ -65,10 +63,7 @@ export function ProjectsProvider({ children }) {
   // 4. Persist user-added projects after state changes.
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(state.addedProjects),
-      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.addedProjects));
     } catch (error) {
       console.error("Failed to save projects:", error);
     }
@@ -78,6 +73,16 @@ export function ProjectsProvider({ children }) {
     dispatch({
       type: "ADD_PROJECT",
       payload: project,
+    });
+  }
+
+  function updateProject(projectId, changes) {
+    dispatch({
+      type: "UPDATE_PROJECT",
+      payload: {
+        id: projectId,
+        changes,
+      },
     });
   }
 
@@ -91,6 +96,7 @@ export function ProjectsProvider({ children }) {
   const value = {
     addedProjects: state.addedProjects,
     addProject,
+    updateProject,
     removeProject,
   };
 
@@ -106,9 +112,7 @@ export function useProjects() {
   const context = useContext(ProjectsContext);
 
   if (context === null) {
-    throw new Error(
-      "useProjects must be used inside ProjectsProvider",
-    );
+    throw new Error("useProjects must be used inside ProjectsProvider");
   }
 
   return context;

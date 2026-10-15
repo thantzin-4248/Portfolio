@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Link } from "react-router";
 import { useProjects } from "../hooks/useProjects";
 
-function ProjectCard({ project }) {
+function ProjectCard({ project, onEdit }) {
   const { addedProjects, removeProject } = useProjects();
 
   const { id, title, description, technologies, category, liveUrl, githubUrl } =
@@ -94,16 +94,23 @@ function ProjectCard({ project }) {
       </div>
 
       {isUserAdded && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="mt-4 rounded-lg border border-red-500/40 px-4 py-2
-            text-sm font-semibold text-red-400 transition
-            hover:bg-red-500/10 focus:outline-none
-            focus:ring-2 focus:ring-red-400"
-        >
-          Delete project
-        </button>
+        <div className="mt-4 flex gap-3">
+          <button
+            type="button"
+            onClick={() => onEdit(project)}
+            className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDelete}
+            className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
       )}
     </article>
   );

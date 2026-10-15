@@ -1,46 +1,92 @@
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
+
 import { projects } from "../data/projects";
 import ProjectCard from "../components/ProjectCard";
 import ProjectForm from "../components/ProjectForm";
+import ProjectFormModal from "../components/ProjectFormModal";
 import { useProjects } from "../hooks/useProjects";
 
 function Projects() {
-  const { addedProjects, addProject } = useProjects();
+  const { addedProjects, addProject, updateProject } = useProjects();
 
-  // Read search and category filters from the URL.
+  // Modal state
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [isFormDirty, setIsFormDirty] = useState(false);
+
+  // Search and category filters
   const [searchParams, setSearchParams] = useSearchParams();
 
   const searchTerm = searchParams.get("q") ?? "";
   const requestedCategory = searchParams.get("category") ?? "All";
 
-  // Combine predefined and user-added projects.
+  // Combine built-in and user-created projects.
   const allProjects = useMemo(
     () => [...projects, ...addedProjects],
     [addedProjects],
   );
 
-  // Generate categories dynamically.
   const categories = useMemo(
     () => [
       "All",
-      ...new Set(
-        allProjects
-          .map((project) => project.category)
-          .filter(Boolean),
-      ),
+      ...new Set(allProjects.map((project) => project.category)),
     ],
     [allProjects],
   );
 
-  // Fall back to All if the URL contains an invalid category.
   const activeCategory = categories.includes(requestedCategory)
     ? requestedCategory
     : "All";
 
-  // Update the search query without losing the category.
-  function updateSearchTerm(value) {
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+
+  function handleOpenAddProject() {
+    setEditingProject(null);
+    setIsFormDirty(false);
+    setIsProjectModalOpen(true);
+  }
+
+  function handleEditProject(project) {
+    setEditingProject(project);
+    setIsFormDirty(false);
+    setIsProjectModalOpen(true);
+  }
+
+  // force=true means a save succeeded, so no warning is needed.
+  function handleCloseProjectModal(force = false) {
+    if (
+      !force &&
+      isFormDirty &&
+      !window.confirm(
+        "You have unsaved changes. Discard them and close the form?",
+      )
+    ) {
+      return;
+    }
+
+    setIsProjectModalOpen(false);
+    setEditingProject(null);
+    setIsFormDirty(false);
+  }
+
+  function handleAddProject(projectData) {
+    const newProject = {
+      ...projectData,
+      id: crypto.randomUUID(),
+    };
+
+    addProject(newProject);
+    setSearchParams({});
+  }
+
+  function handleUpdateProject(projectId, changes) {
+    updateProject(projectId, changes);
+  }
+
+  function handleSearchChange(event) {
+    const value = event.target.value;
     const nextParams = new URLSearchParams(searchParams);
 
     if (value.trim()) {
@@ -49,11 +95,10 @@ function Projects() {
       nextParams.delete("q");
     }
 
-    setSearchParams(nextParams, { replace: true });
+    setSearchParams(nextParams);
   }
 
-  // Update the category without losing the search query.
-  function updateCategory(category) {
+  function handleCategoryChange(category) {
     const nextParams = new URLSearchParams(searchParams);
 
     if (category === "All") {
@@ -65,26 +110,9 @@ function Projects() {
     setSearchParams(nextParams);
   }
 
-  // Add a new project through the shared context.
-  function handleAddProject(projectData) {
-    const newProject = {
-      ...projectData,
-      id: crypto.randomUUID(),
-    };
-
-    addProject(newProject);
-
-    // Clear search and category filters.
-    setSearchParams({});
-  }
-
-  // Reset search and category filters.
   function handleResetFilters() {
     setSearchParams({});
   }
-
-  // Filter projects by category and search term.
-  const normalizedSearch = searchTerm.trim().toLowerCase();
 
   const filteredProjects = useMemo(() => {
     return allProjects.filter((project) => {
@@ -92,177 +120,178 @@ function Projects() {
         activeCategory === "All" ||
         project.category === activeCategory;
 
-      const technologies = Array.isArray(project.technologies)
-        ? project.technologies
-        : [];
-
       const searchableText = [
         project.title,
         project.description,
-        ...technologies,
+        project.category,
+        ...(Array.isArray(project.technologies)
+          ? project.technologies
+          : []),
       ]
-        .filter(Boolean)
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch =
-        searchableText.includes(normalizedSearch);
-
-      return matchesCategory && matchesSearch;
+      return (
+        matchesCategory &&
+        searchableText.includes(normalizedSearch)
+      );
     });
   }, [allProjects, activeCategory, normalizedSearch]);
 
   return (
-    <section
-      id="projects"
-      className="bg-slate-950 px-6 py-20 sm:px-10 lg:px-16"
-    >
+    <section className="min-h-screen bg-slate-950 px-4 py-16 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* Section heading */}
+        {/* Page heading */}
         <div className="mb-10">
-          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-cyan-400">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-cyan-400">
             My Work
           </p>
 
-          <h2 className="mb-4 text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
+          <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
             Featured Projects
-          </h2>
+          </h1>
 
-          <p className="max-w-2xl text-base leading-8 text-slate-400 sm:text-lg">
-            Explore my work, discover the technologies I use, and learn how I
-            approach real-world software development challenges.
+          <p className="mt-4 max-w-2xl text-slate-400">
+            Explore my work, technologies, and projects. You can also add
+            your own projects and update them whenever you need.
           </p>
+
+          <button
+            type="button"
+            onClick={handleOpenAddProject}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950"
+          >
+            <span aria-hidden="true" className="text-xl">
+              +
+            </span>
+            Add Project
+          </button>
         </div>
 
-        {/* Add project form */}
-        <ProjectForm onAddProject={handleAddProject} />
+        {/* Search and category filters */}
+        <div className="mb-8 space-y-5">
+          <div>
+            <label
+              htmlFor="project-search"
+              className="mb-2 block text-sm font-medium text-slate-300"
+            >
+              Search projects
+            </label>
 
-        {/* Search projects */}
-        <div className="mb-8 max-w-xl">
-          <label
-            htmlFor="project-search"
-            className="mb-3 block text-sm font-semibold text-slate-200"
-          >
-            Search projects
-          </label>
-
-          <div className="flex gap-3">
             <input
               id="project-search"
               type="search"
               value={searchTerm}
-              onChange={(event) =>
-                updateSearchTerm(event.target.value)
-              }
-              placeholder="Try React, Laravel, dashboard..."
-              className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+              onChange={handleSearchChange}
+              placeholder="Search by title, technology, or category..."
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
             />
-
-            {searchTerm !== "" && (
-              <button
-                type="button"
-                onClick={() => updateSearchTerm("")}
-                className="rounded-xl border border-slate-700 px-4 py-3 font-medium text-slate-300 transition hover:border-cyan-400 hover:text-cyan-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-              >
-                Clear
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* Category filters */}
-        <div className="mb-8">
-          <p className="mb-4 text-sm font-semibold text-slate-200">
-            Filter by category
-          </p>
+          <div>
+            <p className="mb-3 text-sm font-medium text-slate-300">
+              Filter by category
+            </p>
 
-          <div className="flex flex-wrap gap-3">
-            {categories.map((category) => {
-              const isActive = activeCategory === category;
-
-              return (
+            <div className="flex flex-wrap gap-2">
+              {categories.map((category) => (
                 <button
                   key={category}
                   type="button"
-                  onClick={() => updateCategory(category)}
-                  aria-pressed={isActive}
-                  className={`rounded-full px-5 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950 ${
-                    isActive
+                  onClick={() => handleCategoryChange(category)}
+                  aria-pressed={activeCategory === category}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                    activeCategory === category
                       ? "bg-cyan-400 text-slate-950"
-                      : "border border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-400 hover:text-cyan-400"
+                      : "border border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-400 hover:text-white"
                   }`}
                 >
                   {category}
                 </button>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Project counts */}
-        <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-slate-800 py-4 text-sm text-slate-400">
-          <p>
-            Total projects:{" "}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate-400" aria-live="polite">
+            Showing{" "}
+            <span className="font-semibold text-white">
+              {filteredProjects.length}
+            </span>{" "}
+            of{" "}
             <span className="font-semibold text-white">
               {allProjects.length}
-            </span>
+            </span>{" "}
+            projects
           </p>
 
-          <p aria-live="polite">
-            Matching projects:{" "}
-            <span className="font-semibold text-cyan-400">
-              {filteredProjects.length}
-            </span>
-          </p>
+          {(searchTerm || requestedCategory !== "All") && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-sm font-medium text-cyan-400 transition hover:text-cyan-300 focus:outline-none focus:underline"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
-        {/* Project results */}
+        {/* Project grid */}
         {filteredProjects.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
             {filteredProjects.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
+                onEdit={handleEditProject}
               />
             ))}
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-16 text-center">
-            <div
-              aria-hidden="true"
-              className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-slate-800 text-cyan-400"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-7 w-7"
-              >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m16 16 4 4" />
-              </svg>
-            </div>
-
-            <h3 className="mb-3 text-xl font-semibold text-white">
+          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 px-6 py-16 text-center">
+            <h2 className="text-xl font-semibold text-white">
               No projects found
-            </h3>
+            </h2>
 
-            <p className="mb-6 text-slate-400">
-              Try a different search term or select another category.
+            <p className="mt-3 text-slate-400">
+              Try another search term or category.
             </p>
 
             <button
               type="button"
               onClick={handleResetFilters}
-              className="rounded-lg bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+              className="mt-5 rounded-xl bg-cyan-400 px-5 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-950"
             >
-              Reset filters
+              Clear filters
             </button>
           </div>
         )}
       </div>
+
+      {/* Add/Edit modal */}
+      <ProjectFormModal
+        isOpen={isProjectModalOpen}
+        onClose={handleCloseProjectModal}
+      >
+        {editingProject ? (
+          <ProjectForm
+            key={editingProject.id}
+            project={editingProject}
+            onUpdateProject={handleUpdateProject}
+            onCancel={handleCloseProjectModal}
+            onDirtyChange={setIsFormDirty}
+          />
+        ) : (
+          <ProjectForm
+            key="add-project"
+            onAddProject={handleAddProject}
+            onCancel={handleCloseProjectModal}
+            onDirtyChange={setIsFormDirty}
+          />
+        )}
+      </ProjectFormModal>
     </section>
   );
 }
