@@ -1,265 +1,132 @@
 
-import { useState } from "react";
+import TextField from "./form/TextField";
+import TextareaField from "./form/TextareaField";
+import useProjectForm from "../hooks/useProjectForm";
 
-const initialFormData = {
-  title: "",
-  description: "",
-  category: "",
-  technologies: "",
-  liveUrl: "",
-  githubUrl: "",
-};
-
-function ProjectForm({ onAddProject }) {
-  const [formData, setFormData] = useState(initialFormData);
-  const [formError, setFormError] = useState("");
-
-  // Handle all form fields using one reusable function.
-  function handleInputChange(event) {
-    const { name, value } = event.target;
-
-    setFormData((previousData) => ({
-      ...previousData,
-      [name]: value,
-    }));
-
-    if (formError) {
-      setFormError("");
-    }
-  }
-
-  // Validate and submit the form.
-  function handleSubmit(event) {
-    event.preventDefault();
-    setFormError("");
-
-    const title = formData.title.trim();
-    const description = formData.description.trim();
-    const category = formData.category.trim();
-
-    if (!title || !description || !category) {
-      setFormError("Please complete all required fields.");
-      return;
-    }
-
-    const technologies = formData.technologies
-      .split(",")
-      .map((technology) => technology.trim())
-      .filter(Boolean);
-
-    if (technologies.length === 0) {
-      setFormError("Enter at least one technology.");
-      return;
-    }
-
-    const newProject = {
-      title,
-      description,
-      category,
-      technologies,
-      liveUrl: formData.liveUrl.trim(),
-      githubUrl: formData.githubUrl.trim(),
-    };
-
-    // Send the new project to the parent component.
-    onAddProject(newProject);
-
-    // Reset the form.
-    setFormData({ ...initialFormData });
-    setFormError("");
-  }
-
-  const inputClasses =
-    "w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 text-white placeholder:text-slate-500 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20";
-
-  const labelClasses =
-    "mb-2 block text-sm font-semibold text-slate-200";
+export default function ProjectForm({ onAddProject }) {
+  const {
+    formData,
+    errors,
+    formError,
+    successMessage,
+    isSubmitting,
+    handleChange,
+    handleSubmit,
+    resetForm,
+  } = useProjectForm(onAddProject);
 
   return (
-    <div className="mb-12 rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-lg sm:p-8">
-      {/* Form heading */}
-      <div className="mb-8">
-        <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-cyan-400">
-          Portfolio Management
-        </p>
-
-        <h3 className="text-2xl font-bold text-white sm:text-3xl">
-          Add a New Project
-        </h3>
-
-        <p className="mt-3 leading-7 text-slate-400">
-          Share a project you've built, including its technologies
-          and links to the live demo or source code.
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+    >
+      <div>
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+          Add a project
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Share a project from your portfolio.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Project title */}
-        <div>
-          <label
-            htmlFor="project-title"
-            className={labelClasses}
-          >
-            Project title *
-          </label>
+      <TextField
+        label="Project title"
+        name="title"
+        value={formData.title}
+        onChange={handleChange}
+        error={errors.title}
+        placeholder="e.g. Inventory Management System"
+        required
+        maxLength={100}
+      />
 
-          <input
-            id="project-title"
-            name="title"
-            type="text"
-            value={formData.title}
-            onChange={handleInputChange}
-            required
-            maxLength={100}
-            placeholder="Inventory Management System"
-            className={inputClasses}
-          />
-        </div>
+      <TextareaField
+        label="Description"
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+        error={errors.description}
+        placeholder="Describe the problem your project solves..."
+        required
+        maxLength={500}
+        rows={4}
+      />
 
-        {/* Description */}
-        <div>
-          <label
-            htmlFor="project-description"
-            className={labelClasses}
-          >
-            Description *
-          </label>
+      <TextField
+        label="Category"
+        name="category"
+        value={formData.category}
+        onChange={handleChange}
+        error={errors.category}
+        placeholder="e.g. Web Application"
+        required
+        maxLength={50}
+      />
 
-          <textarea
-            id="project-description"
-            name="description"
-            value={formData.description}
-            onChange={handleInputChange}
-            required
-            maxLength={500}
-            rows={4}
-            placeholder="Describe the problem your project solves..."
-            className={`${inputClasses} resize-y`}
-          />
+      <TextField
+        label="Technologies"
+        name="technologies"
+        value={formData.technologies}
+        onChange={handleChange}
+        error={errors.technologies}
+        placeholder="React, Tailwind CSS, Laravel"
+        required
+      />
+      <p className="text-xs text-slate-500 dark:text-slate-400">
+        Separate technologies with commas. Maximum 20 technologies.
+      </p>
 
-          <p className="mt-2 text-xs text-slate-500">
-            {formData.description.length}/500 characters
-          </p>
-        </div>
+      <TextField
+        label="Live demo URL"
+        name="liveUrl"
+        type="url"
+        value={formData.liveUrl}
+        onChange={handleChange}
+        error={errors.liveUrl}
+        placeholder="https://example.com"
+      />
 
-        {/* Category and technologies */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="project-category"
-              className={labelClasses}
-            >
-              Category *
-            </label>
+      <TextField
+        label="GitHub URL"
+        name="githubUrl"
+        type="url"
+        value={formData.githubUrl}
+        onChange={handleChange}
+        error={errors.githubUrl}
+        placeholder="https://github.com/username/project"
+      />
 
-            <input
-              id="project-category"
-              name="category"
-              type="text"
-              value={formData.category}
-              onChange={handleInputChange}
-              required
-              maxLength={50}
-              placeholder="Frontend, Backend, Full Stack..."
-              className={inputClasses}
-            />
-          </div>
+      {formError && (
+        <p role="alert" className="text-sm text-red-600">
+          {formError}
+        </p>
+      )}
 
-          <div>
-            <label
-              htmlFor="project-technologies"
-              className={labelClasses}
-            >
-              Technologies *
-            </label>
+      {successMessage && (
+        <p role="status" className="text-sm text-green-700">
+          {successMessage}
+        </p>
+      )}
 
-            <input
-              id="project-technologies"
-              name="technologies"
-              type="text"
-              value={formData.technologies}
-              onChange={handleInputChange}
-              required
-              placeholder="React, Laravel, MySQL"
-              className={inputClasses}
-            />
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="rounded-lg bg-indigo-600 px-5 py-2.5 font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isSubmitting ? "Adding..." : "Add project"}
+        </button>
 
-            <p className="mt-2 text-xs text-slate-500">
-              Separate technologies with commas.
-            </p>
-          </div>
-        </div>
-
-        {/* Project URLs */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="project-live-url"
-              className={labelClasses}
-            >
-              Live demo URL
-            </label>
-
-            <input
-              id="project-live-url"
-              name="liveUrl"
-              type="url"
-              value={formData.liveUrl}
-              onChange={handleInputChange}
-              placeholder="https://example.com"
-              className={inputClasses}
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="project-github-url"
-              className={labelClasses}
-            >
-              GitHub URL
-            </label>
-
-            <input
-              id="project-github-url"
-              name="githubUrl"
-              type="url"
-              value={formData.githubUrl}
-              onChange={handleInputChange}
-              placeholder="https://github.com/username/project"
-              className={inputClasses}
-            />
-          </div>
-        </div>
-
-        {/* Validation error */}
-        {formError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
-          >
-            {formError}
-          </p>
-        )}
-
-        {/* Submit button */}
-        <div className="flex flex-wrap items-center gap-4 border-t border-slate-800 pt-6">
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-lg bg-cyan-400 px-6 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-slate-900"
-          >
-            Add Project
-            <span aria-hidden="true" className="ml-2">
-              +
-            </span>
-          </button>
-
-          <p className="text-sm text-slate-500">
-            Fields marked * are required.
-          </p>
-        </div>
-      </form>
-    </div>
+        <button
+          type="button"
+          onClick={resetForm}
+          disabled={isSubmitting}
+          className="rounded-lg border border-slate-300 px-5 py-2.5 font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+        >
+          Reset
+        </button>
+      </div>
+    </form>
   );
 }
-
-export default ProjectForm;
